@@ -38,7 +38,7 @@ notificação → reorganiza.
 └───────────────┬─────────────────────────────────────┬────────────────────────────┘
                 │                                     │
         Gemini API (Flash, free)            Google Calendar API (leitura+escrita)
-        só via _shared/llm                  (lembrete popup = 2ª camada de aviso)
+        só via _shared/llm                  (eventos sem lembrete: só visual)
 ```
 
 ### Princípios
@@ -141,10 +141,12 @@ rotina, categorias). Saída:
       "deadline_hard": false,
       "priority": 3,                  // 1 baixa … 4 urgente
       "location": "qualquer",         // casa | rua | qualquer
+      "region": null,                 // só p/ rua, se você disser onde ("dentista em Praia Grande")
+      "alert_mode": null,             // nenhum | lembrete | alarme; null = padrão (você ajusta na proposta)
       "is_cooking": true,
       "inferred": false,              // true = sugestão da IA (ex.: "estudar p/ prova")
       "subtasks": [
-        { "title": "Comprar ingredientes", "duration_min": 40, "location": "rua" },
+        { "title": "Comprar ingredientes", "duration_min": 40, "location": "rua", "region": null },
         { "title": "Cozinhar",             "duration_min": 90, "location": "casa" },
         { "title": "Porcionar",            "duration_min": 20, "location": "casa" }
       ]
@@ -167,23 +169,25 @@ motivo). Sem `Date.now()` nem aleatoriedade dentro — "agora" é parâmetro.
 
 ### Passo 1 — linha do tempo de lugares
 
-Para cada dia, expande compromissos fixos e eventos em intervalos com **lugar**
-(casa, trabalho, terminal, faculdade). Entre dois compromissos A → B:
+Cada lugar tem uma **região** (cidade). No seu caso: casa em **Praia Grande**;
+trabalho, terminal e faculdade em **Santos**. Para cada dia, o agendador
+expande compromissos fixos e eventos em intervalos com lugar e região. Entre
+dois compromissos A → B:
 
 | Situação | Janela gerada |
 |---|---|
-| Acordar → sair para o 1º compromisso | `casa`, de `wake_time` até `início(B) − desloc(casa→B)` |
-| A e B no mesmo lugar | janela nesse lugar |
-| A ≠ B | volta para casa **só se** sobrar ≥ `go_home_min_stay_min` (padrão 120) em casa depois de `desloc(A→casa) + desloc(casa→B)`; senão a janela é `fora` |
-| Último compromisso → dormir | `casa`, de `fim(A) + desloc(A→casa)` até `sleep_time` |
+| Acordar → sair para o 1º compromisso | `casa` (Praia Grande), de `wake_time` até `início(B) − desloc(casa→B)` |
+| A em casa (ex.: home office) → B fora | `casa` até a hora de sair para B |
+| A fora → B fora | `fora`, na região de A (ex.: Santos). Só volta pra casa no meio se `return_home_in_gaps` estiver ligado **e** sobrar ≥ `go_home_min_stay_min` em casa. No seu perfil fica **desligado** |
+| Último compromisso fora → dormir | primeiro uma janela `fora` opcional na região (dá pra emendar médico, cabelo, compras antes de voltar); o que for usado ali atrasa a chegada em casa. Depois, `casa` de `chegada` até `sleep_time` |
 
-Exemplo (dia de escritório): 16h–19h → ir pra casa custa 1h + ~40 min, sobraria
-1h20 < 2h → janela **fora** de 16h00 às 18h45 (15 min para chegar na
-faculdade). É exatamente a regra "livre, mas fora de casa", saindo de uma regra
-geral — vale também para o dia do terminal e para qualquer rotina editada.
+Exemplo (dia de escritório): 16h → 18h45 é janela **fora, em Santos** (15 min
+para chegar na faculdade). Cabem médico, cabelo, mercado, estudar; não cabem
+arrumar o quarto ou cozinhar. Num dia sem faculdade, uma tarefa de rua em Santos
+pode ser emendada às 16h e você chega em casa depois.
 
-Na quarta (home office) o estágio é em casa: antes das 9h, 16h–19h (ou até a
-faculdade, se houver) e a noite viram janelas `casa` grandes — por isso as
+Na quarta (home office) o estágio é em casa: antes das 9h, depois das 16h até
+sair para a faculdade e a noite viram janelas `casa` grandes. Por isso as
 tarefas de casa naturalmente caem ali.
 
 Deslocamentos são blocos ocupados (mostrados na linha do tempo, não usados).
@@ -195,6 +199,11 @@ Deslocamentos são blocos ocupados (mostrados na linha do tempo, não usados).
 | `casa`     | ✔ | ✘ |
 | `rua`      | ✔ com custo extra de ida/volta (`errand_from_home_overhead_min`, padrão 30) | ✔ |
 | `qualquer` | ✔ | ✔ |
+
+Tarefas `rua` podem ter **região** ("dentista em Praia Grande"). Com região,
+só entram em janelas daquela região: um dentista em Praia Grande vai para uma
+saída a partir de casa, não para o intervalo em Santos. Sem região, entram em
+qualquer uma. A IA preenche a região quando você fala o lugar.
 
 ### Passo 3 — encaixe
 
@@ -232,16 +241,49 @@ de "mais tempo" é sempre aplicada na hora; só o efeito dominó vira proposta).
 
 ---
 
-## 5. Notificações (3 camadas)
+## 5. Notificações
 
-| Camada | Onde | Como |
-|---|---|---|
-| 1 | Android | `@capacitor/local-notifications`: alarme exato (`allowWhileIdle`), canal de alta prioridade, 3 botões de ação. Agendadas no aparelho → funcionam sem internet. |
-| 1 | Desktop | Web Push (VAPID) pelo service worker. Fila `notification_jobs`; pg_cron a cada minuto chama `push-dispatch` só se houver item vencido. |
-| 2 | Ambos | Evento no calendário "Agenda IA" do Google com lembrete popup. |
+Os avisos vêm **só do app**. Os eventos no Google Calendar são criados **sem
+lembrete** e servem apenas para você ver a agenda (§6).
 
-- **Tipos**: lembrete (N min antes), início, fim (check-in), nova proposta. Cada
-  um liga/desliga em Config.
+| Onde | Como |
+|---|---|
+| Android | `@capacitor/local-notifications`, agendadas no aparelho (funcionam sem internet), com 3 botões de ação. |
+| Desktop | Web Push (VAPID) pelo service worker. Fila `notification_jobs`; pg_cron a cada minuto chama `push-dispatch` só se houver item vencido. |
+
+### Tipo de aviso, escolhido por tarefa
+
+Na proposta (e na edição) cada tarefa tem um seletor. O padrão fica em Config
+(`default_alert_mode`, inicialmente **Lembrete**).
+
+| Modo | Comportamento |
+|---|---|
+| **Lembrete** (padrão) | Notificação comum: um toque curto de notificação (ou nenhum, no modo silencioso) e fica na gaveta. **Não toca como despertador.** |
+| **Alarme** | Toca como despertador, com som contínuo e tela cheia, até você dispensar. Para o que não pode perder (prova, médico). |
+| **Nenhum** | Sem notificação; o check-in aparece pendente na tela Hoje quando você abrir o app. |
+
+"Alarme exato" (permissão do Android) **não** significa tocar alarme: é só o
+nome do agendamento que dispara no minuto certo, mesmo com o celular em
+economia de bateria. Os lembretes usam esse agendamento para não chegarem
+atrasados.
+
+O **Alarme** precisa de um pedaço nativo pequeno na Fase 3: canal com som de
+alarme repetindo e notificação de tela cheia. O plugin padrão do Capacitor não
+faz isso.
+
+### Pouca notificação
+
+- **No máximo uma notificação do app por vez na gaveta.** Todas usam o mesmo
+  identificador, então a nova substitui a anterior em vez de empilhar. Check-ins
+  não respondidos ficam pendentes na tela Hoje, não na gaveta.
+- Por tarefa: uma no início ("Agora: Cozinhar, até 15h30") e uma no fim
+  (check-in), que **substitui** a do início. O aviso do início e o do fim
+  ligam/desligam separadamente em Config.
+- **Silêncio**: padrão 00h → horário de acordar (editável). Nada é agendado
+  nessa faixa; o que cairia ali vai para o primeiro minuto depois. Alarmes
+  também respeitam o silêncio, salvo se você marcar a tarefa como exceção.
+- **Modo silencioso**: lembretes sem som nem vibração (canal de baixa
+  importância no Android; `silent: true` no Web Push).
 - **Silêncio**: padrão 00h → horário de acordar (editável). Nada é agendado
   nessa faixa; o que cairia ali vai para o primeiro minuto depois.
 - **Modo silencioso**: notifica sem som/vibração (canal de baixa importância no
@@ -256,9 +298,9 @@ de "mais tempo" é sempre aplicada na hora; só o efeito dominó vira proposta).
   que replaneja localmente e sincroniza. Na Fase 3 avalio um receiver nativo
   para "Terminei" funcionar sem trazer o app para a frente.
 - **Limitação conhecida**: se o plano mudar no desktop, o celular só reagenda
-  os alarmes quando o app abrir/voltar ao primeiro plano (a camada 2, o Google
-  Calendar, cobre esse intervalo). Se incomodar, dá pra adicionar FCM
-  (gratuito) depois.
+  os avisos quando o app abrir ou voltar para a frente. Até lá, um aviso pode
+  sair no horário antigo. Se incomodar, dá para adicionar FCM (gratuito) depois.
+  Outra opção é ligar os lembretes do Calendar como reserva (§6).
 
 ---
 
@@ -272,9 +314,15 @@ de "mais tempo" é sempre aplicada na hora; só o efeito dominó vira proposta).
 - **Leitura**: calendários escolhidos em Config → tabela `events`
   (`source='gcal'`) via `syncToken` incremental. Eventos "disponível"
   (`transparency=transparent`) não bloqueiam.
-- **Escrita**: cada bloco confirmado vira/atualiza um evento no calendário
-  "Agenda IA" com lembrete popup. Como é um calendário separado, ele nunca é
-  lido de volta como compromisso.
+- **Escrita**: cada bloco confirmado vira ou atualiza um evento no calendário
+  "Agenda IA". Como é um calendário separado, ele nunca é lido de volta como
+  compromisso.
+- **Sem notificação do Calendar**: os eventos são criados com
+  `reminders: { useDefault: false, overrides: [] }`. O calendário "Agenda IA" é
+  criado sem lembretes padrão (`defaultReminders: []`) e sem convidados
+  (`sendUpdates: "none"`), então o app do Google Agenda não avisa nada nem manda
+  e-mail. Em Config há a chave "Lembretes do Google Calendar"
+  (`gcal_reminders`, desligada), caso um dia você queira essa reserva.
 
 ---
 

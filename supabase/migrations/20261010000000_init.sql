@@ -50,13 +50,16 @@ create table public.profiles (
   quiet_end                     time,            -- null = usa wake_time
   silent_mode                   boolean not null default false,
   notify_types                  jsonb not null default
-                                  '{"lembrete": true, "inicio": true, "fim": true, "proposta": true}',
-  reminder_lead_min             integer not null default 10 check (reminder_lead_min >= 0),
+                                  '{"inicio": true, "fim": true, "proposta": true}',
+  default_alert_mode            text not null default 'lembrete'
+                                  check (default_alert_mode in ('nenhum', 'lembrete', 'alarme')),
+  reminder_lead_min             integer not null default 0 check (reminder_lead_min >= 0),
   more_time_default_min         integer not null default 15 check (more_time_default_min > 0),
 
   -- agendador
   slot_granularity_min          integer not null default 15 check (slot_granularity_min > 0),
   task_buffer_min               integer not null default 10 check (task_buffer_min >= 0),
+  return_home_in_gaps           boolean not null default false,  -- entre compromissos fora, volta pra casa?
   go_home_min_stay_min          integer not null default 120 check (go_home_min_stay_min >= 0),
   errand_from_home_overhead_min integer not null default 30 check (errand_from_home_overhead_min >= 0),
   late_hour                     time not null default '22:00',  -- depois disso, custo extra
@@ -64,6 +67,7 @@ create table public.profiles (
   -- Google Calendar
   gcal_calendar_id              text,            -- calendário "Agenda IA" criado pelo app
   gcal_read_calendar_ids        text[] not null default '{}',
+  gcal_reminders                boolean not null default false,  -- false = eventos sem lembrete
 
   onboarding_done               boolean not null default false,
   created_at                    timestamptz not null default now(),
@@ -75,6 +79,7 @@ create table public.places (
   user_id     uuid not null references auth.users on delete cascade,
   kind        text not null check (kind in ('casa', 'trabalho', 'terminal', 'faculdade', 'outro')),
   name        text not null,
+  region      text,            -- cidade/bairro, ex.: 'Santos', 'Praia Grande'
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   deleted_at  timestamptz
@@ -199,6 +204,8 @@ create table public.tasks (
   deadline_hard      boolean not null default true,
   priority           smallint not null default 2 check (priority between 1 and 4),
   location_req       text not null default 'qualquer' check (location_req in ('casa', 'rua', 'qualquer')),
+  region             text,                             -- só p/ 'rua': onde precisa ser (null = tanto faz)
+  alert_mode         text check (alert_mode in ('nenhum', 'lembrete', 'alarme')),  -- null = padrão do perfil
   splittable         boolean not null default false,
   min_chunk_min      integer check (min_chunk_min > 0),
   is_cooking         boolean not null default false,
@@ -240,6 +247,7 @@ create table public.schedule_blocks (
   start_at        timestamptz not null,
   end_at          timestamptz not null,
   window_kind     text check (window_kind in ('casa', 'fora')),
+  region          text,                             -- onde a janela acontece
   status          text not null default 'proposto'
                     check (status in ('proposto', 'confirmado', 'em_andamento', 'concluido', 'remarcado', 'cancelado')),
   locked          boolean not null default false,   -- movido à mão: o agendador não mexe
@@ -291,7 +299,7 @@ create table public.notification_jobs (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users on delete cascade,
   block_id    uuid references public.schedule_blocks on delete cascade,
-  kind        text not null check (kind in ('lembrete', 'inicio', 'fim', 'proposta')),
+  kind        text not null check (kind in ('inicio', 'fim', 'proposta')),
   fire_at     timestamptz not null,
   status      text not null default 'agendada'
                 check (status in ('agendada', 'enviada', 'cancelada', 'falhou')),
