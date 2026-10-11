@@ -131,7 +131,8 @@ Regras:
 - region: só para location "rua" e SOMENTE se o próprio texto citar a cidade (regiões conhecidas: ${ctx.regions.join(", ") || "nenhuma"}). Nunca deduza a região pela casa ou pela rotina. Na dúvida, null.
 - category: pessoal, faculdade, tcc, empresa_junior ou trabalho (estágio).
 - deadline: ISO 8601 com o fuso do usuário. "quinta tenho prova" → a preparação termina antes do dia da prova. Comida "pra semana" sem dia dito → deadline null e priority 3 (o agendador faz o quanto antes). Sem prazo: null. Nunca use um prazo no passado nem no mesmo dia, a menos que o texto diga "hoje".
-- earliest_start: só se o texto disser que não dá para começar antes de algo ("depois de sexta"). Senão null.
+- Tarefa com dia dito ("amanhã lavo roupa", "sexta preciso ir ao banco"): earliest_start = início desse dia (00:00) e deadline = fim desse dia (23:59), deadline_hard false.
+- earliest_start: também quando o texto disser que não dá para começar antes de algo ("depois de sexta"). Senão null.
 - deadline_hard: true quando perder o prazo tem consequência real (prova, entrega); false quando é preferência.
 - priority: 1 baixa, 2 normal, 3 alta, 4 urgente (prazo nas próximas 48 h e importante).
 - is_cooking: true para preparo de comida.
