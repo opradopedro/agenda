@@ -1,14 +1,15 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../data/db";
-import { DEFAULT_SETTINGS } from "../data/defaults";
+import { normalizeSettings } from "../data/defaults";
 import { saveSettings } from "../data/routine";
 import type { AlertMode, Settings as S } from "../data/types";
 import { ALERT_LABEL } from "../lib/format";
 import { navigate } from "../lib/router";
 import { toast } from "../components/Toast";
+import { TimeField } from "../components/TimeField";
 
 export function Settings() {
-  const s = useLiveQuery(async () => ({ ...DEFAULT_SETTINGS, ...(await db.settings.get("me")) }), []);
+  const s = useLiveQuery(async () => normalizeSettings(await db.settings.get("me")), []);
   if (!s) return null;
   const set = (patch: Partial<S>) => saveSettings(patch);
 
@@ -33,17 +34,28 @@ export function Settings() {
 
       <div className="section-title">Rotina</div>
       <div className="card stack">
-        <div className="small muted">Acorda {s.wakeTime} · dorme {s.sleepTime}. Estágio, faculdade, lugares e deslocamentos.</div>
+        <div className="small muted">
+          {s.routine.sleep.sameTime
+            ? `Acorda ${s.routine.sleep.wake ?? "sem horário fixo"} · dorme ${s.routine.sleep.sleep ?? "sem horário fixo"}`
+            : "Horários de acordar e dormir diferentes por dia"}
+          . Estágio, faculdade, lugares e deslocamentos.
+        </div>
         <button className="btn" onClick={() => navigate("rotina")}>Editar rotina</button>
       </div>
 
       <div className="section-title">Notificações</div>
       <div className="card">
         <p className="small muted" style={{ marginTop: 0 }}>As notificações começam a funcionar na Fase 2 (computador) e na Fase 3 (Android). As escolhas já ficam salvas.</p>
-        <div className="grid2">
-          <label className="field"><span>Silêncio a partir de</span><input type="time" value={s.quietStart} onChange={(e) => set({ quietStart: e.target.value })} /></label>
-          <label className="field"><span>até</span><input type="time" value={s.quietEnd ?? s.wakeTime} onChange={(e) => set({ quietEnd: e.target.value })} /></label>
-        </div>
+        <Toggle label="Silêncio enquanto durmo" hint="Segue o horário de dormir e acordar de cada dia" checked={s.quietStart === null}
+          onChange={(v) => set(v ? { quietStart: null, quietEnd: null } : { quietStart: "00:00", quietEnd: "07:00" })} />
+        {s.quietStart !== null && (
+          <div className="row wrap" style={{ padding: "4px 0 10px" }}>
+            <span className="small muted">Silêncio das</span>
+            <TimeField label="Silêncio a partir de" value={s.quietStart} onChange={(v) => set({ quietStart: v ?? "00:00" })} />
+            <span className="small muted">às</span>
+            <TimeField label="Silêncio até" value={s.quietEnd ?? "07:00"} onChange={(v) => set({ quietEnd: v ?? "07:00" })} />
+          </div>
+        )}
         <Toggle label="Modo silencioso" hint="Notifica sem som e sem vibrar" checked={s.silentMode} onChange={(v) => set({ silentMode: v })} />
         <Toggle label="Aviso no início da tarefa" checked={s.notifyStart} onChange={(v) => set({ notifyStart: v })} />
         <Toggle label="Check-in no fim da tarefa" hint="Terminei · Mais tempo · Remarcar" checked={s.notifyEnd} onChange={(v) => set({ notifyEnd: v })} />
@@ -63,7 +75,7 @@ export function Settings() {
           <label className="field"><span>Intervalo entre tarefas (min)</span>
             <input type="number" inputMode="numeric" min={0} max={60} value={s.taskBufferMin} onChange={(e) => set({ taskBufferMin: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <label className="field"><span>Evitar tarefas depois de</span>
-            <input type="time" value={s.lateHour} onChange={(e) => set({ lateHour: e.target.value })} /></label>
+            <TimeField label="Evitar tarefas depois de" value={s.lateHour} onChange={(v) => set({ lateHour: v ?? "22:00" })} /></label>
           <label className="field"><span>Ida e volta p/ recado saindo de casa (min)</span>
             <input type="number" inputMode="numeric" min={0} max={180} value={s.errandFromHomeOverheadMin} onChange={(e) => set({ errandFromHomeOverheadMin: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <label className="field"><span>Planejar quantos dias à frente</span>

@@ -143,14 +143,22 @@ function anchorsFor(date: string, input: ScheduleInput, awakeStart: Min, awakeEn
   return merged;
 }
 
+/** Acordar/dormir efetivos de um dia (com o padrão para "sem horário fixo"). */
+export function dayTimesFor(date: string, s: ScheduleInput["settings"]): { wake: string; sleep: string } {
+  const d = s.dayTimes?.[weekdayOf(date)];
+  return { wake: d?.wake ?? s.wakeTime, sleep: d?.sleep ?? s.sleepTime };
+}
+
 /** Janela acordado: do horário de acordar até dormir ou o início do silêncio. */
 export function awakeBounds(date: string, input: ScheduleInput): [Min, Min] {
   const s = input.settings;
   const tz = s.timezone;
-  const wake = hhmmToMin(s.wakeTime);
+  const t = dayTimesFor(date, s);
+  const wake = hhmmToMin(t.wake);
   const start = localToMin(date, wake, tz);
-  const sleep = hhmmToMin(s.sleepTime);
+  const sleep = hhmmToMin(t.sleep);
   const end = localToMin(date, sleep > wake ? sleep : sleep + 1440, tz);
+  if (!s.quietStart) return [start, end];
   const q = hhmmToMin(s.quietStart);
   const quiet = localToMin(date, q > wake ? q : q + 1440, tz);
   return [start, Math.min(end, quiet)];

@@ -6,6 +6,7 @@ import { approvePlan, discardPlan, replan } from "../data/planner";
 import type { Block, Task } from "../data/types";
 import { IconBack, IconTrash } from "../components/Icons";
 import { TaskEdit } from "../components/TaskEdit";
+import { DateTimeField } from "../components/TimeField";
 import { toast } from "../components/Toast";
 import { Meta } from "./Inbox";
 import { ALERT_LABEL, fmtDayLabel, fmtRange, localDate, tz } from "../lib/format";
@@ -82,7 +83,7 @@ export function Proposal({ planId }: { planId: string }) {
         )}
         {!decided && moving?.id === b.id && (
           <div className="row" style={{ width: "100%" }}>
-            <input type="datetime-local" value={moving.value} onChange={(e) => setMoving({ id: b.id, value: e.target.value })} aria-label="Novo início" />
+            <div style={{ flex: 1, minWidth: 0 }}><DateTimeField label="Novo início" value={moving.value} onChange={(v) => setMoving({ id: b.id, value: v })} /></div>
             <button className="btn primary" disabled={busy} onClick={() => { const v = moving.value; setMoving(null); moveBlock(b, v); }}>Fixar</button>
           </div>
         )}

@@ -42,11 +42,21 @@ export interface CalendarEvent {
   placeId?: string | null;
 }
 
+/** Horário de acordar/dormir de um dia. null = sem horário fixo. */
+export interface DayTimes {
+  wake: string | null;
+  sleep: string | null;
+}
+
 export interface SchedulerSettings {
   timezone: string;
+  /** Referência para os dias (ou campos) sem horário fixo. */
   wakeTime: string;
   sleepTime: string;
-  quietStart: string;
+  /** Horários por dia da semana (0–6). Dia ausente ou campo null → wakeTime/sleepTime. */
+  dayTimes?: Partial<Record<number, DayTimes>>;
+  /** Início do silêncio; null = segue o horário de dormir de cada dia. */
+  quietStart: string | null;
   quietEnd: string | null;
   slotGranularityMin: number;
   taskBufferMin: number;

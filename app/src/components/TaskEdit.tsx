@@ -4,6 +4,7 @@ import { CATEGORIES } from "@shared/interpret/contract.ts";
 import { db, nowIso } from "../data/db";
 import type { AlertMode, Task } from "../data/types";
 import { ALERT_LABEL, CATEGORY_LABEL, tz } from "../lib/format";
+import { DateTimeField } from "./TimeField";
 
 const toLocalInput = (iso: string | null) => {
   if (!iso) return "";
@@ -55,13 +56,13 @@ export function TaskEdit({ task, isParent, onSaved, onCancel }: { task: Task; is
         </>
       )}
       <div className="grid2">
-        <label className="field"><span>Prazo</span>
-          <input type="datetime-local" value={toLocalInput(t.deadline)} onChange={(e) => set("deadline", fromLocalInput(e.target.value))} /></label>
         <label className="field"><span>Prioridade</span>
           <select value={t.priority} onChange={(e) => set("priority", Number(e.target.value))}>
             <option value={1}>Baixa</option><option value={2}>Normal</option><option value={3}>Alta</option><option value={4}>Urgente</option>
           </select></label>
       </div>
+      <label className="field"><span>Prazo</span>
+        <DateTimeField label="Prazo" clearable value={toLocalInput(t.deadline)} onChange={(v) => set("deadline", fromLocalInput(v))} /></label>
       {t.deadline && (
         <div className="switch-row"><div className="label">Prazo rígido<small>Desligado: pode passar do prazo se não couber.</small></div>
           <input type="checkbox" className="toggle" checked={t.deadlineHard} onChange={(e) => set("deadlineHard", e.target.checked)} /></div>

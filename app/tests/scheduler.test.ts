@@ -214,6 +214,22 @@ describe("encaixe", () => {
     expect(r.blocks[0].windowKind).toBe("casa");
   });
 
+  it("horários diferentes por dia: sexta acorda 9h e dorme 2h", () => {
+    const s = { ...base().settings, quietStart: null, dayTimes: { 5: { wake: "09:00", sleep: "02:00" } } };
+    const tl = dayTimeline("2026-10-16", base({ settings: s }));
+    expect(hm(tl[0].start)).toBe("09:00"); // acorda 9h → já sai atrasado para o estágio
+    const last = tl[tl.length - 1];
+    expect(last.end).toBe("2026-10-17T02:00:00-03:00");
+    // outros dias seguem o padrão
+    expect(hm(dayTimeline("2026-10-12", base({ settings: s }))[0].start)).toBe("07:00");
+  });
+
+  it("sem horário fixo usa a referência geral", () => {
+    const s = { ...base().settings, wakeTime: "08:00", dayTimes: { 6: { wake: null, sleep: null } } };
+    const tl = dayTimeline("2026-10-17", base({ settings: s }));
+    expect(tl.map((x) => `${hm(x.start)}-${hm(x.end)}`)).toEqual(["08:00-00:00"]);
+  });
+
   it("nada depois do início do silêncio (00h)", () => {
     const tasks = Array.from({ length: 12 }, (_, i) => task({ id: `t${i}`, durationMin: 60, location: "qualquer" }));
     const r = schedule(base({ tasks }));

@@ -2,7 +2,7 @@
 // aplica check-ins (Terminei / Mais tempo / Remarcar) com reparo mínimo.
 import { schedule, type ScheduleInput, type TaskInput } from "@shared/scheduler/index.ts";
 import { db, newId, nowIso } from "./db";
-import { getSettings } from "./routine";
+import { getSettings, sleepFor } from "./routine";
 import type { Block, Plan, PlanTrigger, Settings, Task } from "./types";
 
 const ACTIVE: Block["status"][] = ["confirmado", "em_andamento"];
@@ -13,6 +13,7 @@ export function toSchedulerSettings(s: Settings): ScheduleInput["settings"] {
     timezone: s.timezone,
     wakeTime: s.wakeTime,
     sleepTime: s.sleepTime,
+    dayTimes: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((wd) => [wd, sleepFor(s.routine, wd)])),
     quietStart: s.quietStart,
     quietEnd: s.quietEnd,
     slotGranularityMin: s.slotGranularityMin,

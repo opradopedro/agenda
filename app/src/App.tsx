@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "./data/db";
-import { DEFAULT_SETTINGS } from "./data/defaults";
+import { normalizeSettings } from "./data/defaults";
 import { CaptureBar } from "./components/CaptureBar";
 import { IconGear, IconInbox, IconToday, IconWeek } from "./components/Icons";
 import { ToastHost } from "./components/Toast";
@@ -23,7 +23,7 @@ const TABS = [
 ] as const;
 
 export function App() {
-  const settings = useLiveQuery(async () => ({ ...DEFAULT_SETTINGS, ...(await db.settings.get("me")) }), []);
+  const settings = useLiveQuery(async () => normalizeSettings(await db.settings.get("me")), []);
   const inboxCount = useLiveQuery(async () => {
     const captures = await db.captures.where("status").equals("erro").count();
     const suggestions = await db.tasks.where("status").equals("inbox").filter((t) => !t.parentId).count();

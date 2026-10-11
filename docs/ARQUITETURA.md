@@ -171,6 +171,10 @@ motivo). Sem `Date.now()` nem aleatoriedade dentro — "agora" é parâmetro.
 
 ### Passo 1 — linha do tempo de lugares
 
+Acordar e dormir podem ser iguais todos os dias ou diferentes por dia, e cada
+um pode ficar "sem horário fixo" (o agendador usa uma referência configurável,
+padrão 08:00–00:00). Estágio e faculdade também aceitam um horário por dia.
+
 Cada lugar tem uma **região** (cidade). No seu caso: casa em **Praia Grande**;
 trabalho, terminal e faculdade em **Santos**. Para cada dia, o agendador
 expande compromissos fixos e eventos em intervalos com lugar e região. Entre

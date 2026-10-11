@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { DEFAULT_ROUTINE } from "../data/defaults";
 import { applyRoutine, WEEKDAYS, WEEKDAYS_SHORT } from "../data/routine";
-import type { AlertMode, RoutineDraft, ScheduleMode, Settings } from "../data/types";
+import type { AlertMode, RoutineDraft, ScheduleMode, Settings, TimeRange } from "../data/types";
+import { TimeField } from "../components/TimeField";
 
 type Where = "trabalho" | "terminal" | "casa" | null;
 
 const STEPS = ["Horários", "Lugares", "Estágio", "Faculdade", "Deslocamentos", "Preferências"];
+const WEEK = [1, 2, 3, 4, 5, 6, 0];
 
 const TRAVEL_LABELS: [string, string][] = [
   ["casa>trabalho", "Casa → Escritório"],
@@ -20,9 +21,9 @@ const TRAVEL_LABELS: [string, string][] = [
 
 export function Onboarding({ settings, onDone, editing = false }: { settings: Settings; onDone: () => void; editing?: boolean }) {
   const [step, setStep] = useState(0);
-  const [wake, setWake] = useState(settings.wakeTime);
-  const [sleep, setSleep] = useState(settings.sleepTime);
-  const [r, setR] = useState<RoutineDraft>(() => structuredClone(settings.routine ?? DEFAULT_ROUTINE));
+  const [r, setR] = useState<RoutineDraft>(() => structuredClone(settings.routine));
+  const [flexWake, setFlexWake] = useState(settings.wakeTime);
+  const [flexSleep, setFlexSleep] = useState(settings.sleepTime);
   const [mode, setMode] = useState<ScheduleMode>(settings.scheduleMode);
   const [alert, setAlert] = useState<AlertMode>(settings.defaultAlertMode);
   const [returnHome, setReturnHome] = useState(settings.returnHomeInGaps);
@@ -42,9 +43,25 @@ export function Onboarding({ settings, onDone, editing = false }: { settings: Se
       if (wd >= 0) d.internship.days[wd] = "terminal";
     });
 
+  // ao desligar "mesmo horário", cada dia começa com o horário comum
+  const setSleepSame = (same: boolean) =>
+    upd((d) => {
+      if (!same) for (const wd of WEEK) d.sleep.days[wd] = { wake: d.sleep.wake, sleep: d.sleep.sleep };
+      d.sleep.sameTime = same;
+    });
+  const setRangeSame = (key: "internship" | "college", same: boolean) =>
+    upd((d) => {
+      if (!same) for (const wd of WEEK) d[key].times[wd] = { start: d[key].start, end: d[key].end };
+      d[key].sameTime = same;
+    });
+
+  const anyNoTime = r.sleep.sameTime
+    ? r.sleep.wake === null || r.sleep.sleep === null
+    : WEEK.some((wd) => r.sleep.days[wd]?.wake === null || r.sleep.days[wd]?.sleep === null);
+
   async function finish() {
     setSaving(true);
-    await applyRoutine(r, { wakeTime: wake, sleepTime: sleep, quietStart: sleep, scheduleMode: mode, defaultAlertMode: alert, returnHomeInGaps: returnHome });
+    await applyRoutine(r, { wakeTime: flexWake, sleepTime: flexSleep, scheduleMode: mode, defaultAlertMode: alert, returnHomeInGaps: returnHome });
     onDone();
   }
 
@@ -57,11 +74,39 @@ export function Onboarding({ settings, onDone, editing = false }: { settings: Se
         <div className="stack">
           <h1>{editing ? "Sua rotina" : "Vamos montar sua semana"}</h1>
           <p className="lead">Tudo aqui pode ser mudado depois em Config. Comece pelos horários em que você está acordado.</p>
-          <div className="grid2">
-            <label className="field"><span>Acordo às</span><input type="time" value={wake} onChange={(e) => setWake(e.target.value)} /></label>
-            <label className="field"><span>Durmo às</span><input type="time" value={sleep} onChange={(e) => setSleep(e.target.value)} /></label>
-          </div>
-          <p className="muted small">Nada é agendado entre a hora de dormir e a de acordar, e as notificações ficam em silêncio nesse período.</p>
+          <SameToggle checked={r.sleep.sameTime} onChange={setSleepSame} />
+          {r.sleep.sameTime ? (
+            <div className="grid2">
+              <label className="field"><span>Acordo às</span>
+                <TimeField label="Acordo às" value={r.sleep.wake} noneLabel="sem horário" fallback="07:00" onChange={(v) => upd((d) => void (d.sleep.wake = v))} /></label>
+              <label className="field"><span>Durmo às</span>
+                <TimeField label="Durmo às" value={r.sleep.sleep} noneLabel="sem horário" fallback="00:00" onChange={(v) => upd((d) => void (d.sleep.sleep = v))} /></label>
+            </div>
+          ) : (
+            <div className="times-grid">
+              <span /><span className="head">Acordo</span><span className="head">Durmo</span>
+              {WEEK.map((wd) => (
+                <Row3 key={wd} day={WEEKDAYS_SHORT[wd]}>
+                  <TimeField label={`${WEEKDAYS[wd]}: acordo`} value={r.sleep.days[wd]?.wake ?? null} noneLabel="sem horário" fallback="07:00"
+                    onChange={(v) => upd((d) => void (d.sleep.days[wd] = { ...d.sleep.days[wd], wake: v }))} />
+                  <TimeField label={`${WEEKDAYS[wd]}: durmo`} value={r.sleep.days[wd]?.sleep ?? null} noneLabel="sem horário" fallback="00:00"
+                    onChange={(v) => upd((d) => void (d.sleep.days[wd] = { ...d.sleep.days[wd], sleep: v }))} />
+                </Row3>
+              ))}
+            </div>
+          )}
+          {anyNoTime && (
+            <div className="card stack">
+              <span className="small">Nos dias sem horário fixo, planejar como se eu estivesse acordado</span>
+              <div className="row wrap">
+                <span className="small muted">das</span>
+                <TimeField label="Referência: acordar" value={flexWake} onChange={(v) => setFlexWake(v ?? "08:00")} />
+                <span className="small muted">às</span>
+                <TimeField label="Referência: dormir" value={flexSleep} onChange={(v) => setFlexSleep(v ?? "00:00")} />
+              </div>
+            </div>
+          )}
+          <p className="muted small">Nada é agendado enquanto você dorme, e as notificações ficam em silêncio nesse período.</p>
         </div>
       )}
 
@@ -87,21 +132,30 @@ export function Onboarding({ settings, onDone, editing = false }: { settings: Se
             <input type="checkbox" className="toggle" checked={r.internship.enabled} onChange={(e) => upd((d) => void (d.internship.enabled = e.target.checked))} /></div>
           {r.internship.enabled && (
             <>
-              <div className="grid2">
-                <label className="field"><span>Começa</span><input type="time" value={r.internship.start} onChange={(e) => upd((d) => void (d.internship.start = e.target.value))} /></label>
-                <label className="field"><span>Termina</span><input type="time" value={r.internship.end} onChange={(e) => upd((d) => void (d.internship.end = e.target.value))} /></label>
-              </div>
               <label className="field"><span>Qual é o dia do terminal?</span>
                 <select value={terminalDay} onChange={(e) => setTerminalDay(Number(e.target.value))}>
                   <option value={-1}>Não vou ao terminal</option>
                   {[1, 2, 3, 4, 5, 6].map((d) => <option key={d} value={d}>{WEEKDAYS[d]}</option>)}
                 </select>
               </label>
-              <p className="muted small">Onde é o estágio em cada dia (home office = Casa):</p>
-              <div className="daygrid">
-                {[1, 2, 3, 4, 5, 6, 0].map((wd) => (
-                  <Day key={wd} wd={wd} value={r.internship.days[wd] ?? null} onChange={(v) => upd((d) => void (d.internship.days[wd] = v))} />
-                ))}
+              <SameToggle checked={r.internship.sameTime} onChange={(v) => setRangeSame("internship", v)} />
+              {r.internship.sameTime && (
+                <RangeFields value={r.internship} onChange={(t) => upd((d) => Object.assign(d.internship, t))} />
+              )}
+              <p className="muted small" style={{ margin: 0 }}>Onde é o estágio em cada dia (home office = Casa):</p>
+              <div>
+                {WEEK.map((wd) => {
+                  const where = r.internship.days[wd] ?? null;
+                  return (
+                    <div key={wd} className="day-card">
+                      <b>{WEEKDAYS[wd]}</b>
+                      <PlaceSeg value={where} onChange={(v) => upd((d) => void (d.internship.days[wd] = v))} />
+                      {where && !r.internship.sameTime && (
+                        <RangeFields value={r.internship.times[wd] ?? r.internship} onChange={(t) => upd((d) => void (d.internship.times[wd] = t))} />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
@@ -115,13 +169,9 @@ export function Onboarding({ settings, onDone, editing = false }: { settings: Se
             <input type="checkbox" className="toggle" checked={r.college.enabled} onChange={(e) => upd((d) => void (d.college.enabled = e.target.checked))} /></div>
           {r.college.enabled && (
             <>
-              <div className="grid2">
-                <label className="field"><span>Começa</span><input type="time" value={r.college.start} onChange={(e) => upd((d) => void (d.college.start = e.target.value))} /></label>
-                <label className="field"><span>Termina</span><input type="time" value={r.college.end} onChange={(e) => upd((d) => void (d.college.end = e.target.value))} /></label>
-              </div>
-              <p className="muted small">Quais dias?</p>
+              <p className="muted small" style={{ margin: 0 }}>Quais dias?</p>
               <div className="row wrap">
-                {[1, 2, 3, 4, 5, 6].map((wd) => {
+                {[1, 2, 3, 4, 5, 6, 0].map((wd) => {
                   const on = r.college.days.includes(wd);
                   return (
                     <button key={wd} type="button" className={`chip ${on ? "on" : ""}`} style={{ padding: "8px 14px", fontSize: "0.9rem" }}
@@ -131,6 +181,19 @@ export function Onboarding({ settings, onDone, editing = false }: { settings: Se
                   );
                 })}
               </div>
+              <SameToggle checked={r.college.sameTime} onChange={(v) => setRangeSame("college", v)} />
+              {r.college.sameTime ? (
+                <RangeFields value={r.college} onChange={(t) => upd((d) => Object.assign(d.college, t))} />
+              ) : (
+                <div>
+                  {WEEK.filter((wd) => r.college.days.includes(wd)).map((wd) => (
+                    <div key={wd} className="day-card">
+                      <b>{WEEKDAYS[wd]}</b>
+                      <RangeFields value={r.college.times[wd] ?? r.college} onChange={(t) => upd((d) => void (d.college.times[wd] = t))} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -181,15 +244,45 @@ export function Onboarding({ settings, onDone, editing = false }: { settings: Se
   );
 }
 
-function Day({ wd, value, onChange }: { wd: number; value: Where; onChange: (v: Where) => void }) {
-  const opts: [Where, string][] = [["trabalho", "Escritório"], ["terminal", "Terminal"], ["casa", "Casa"], [null, "Folga"]];
+function SameToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="switch-row">
+      <span className="label">Mesmo horário todos os dias<small>{checked ? "Desligue para escolher um horário por dia." : "Cada dia tem o seu horário."}</small></span>
+      <input type="checkbox" className="toggle" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    </label>
+  );
+}
+
+function RangeFields({ value, onChange }: { value: TimeRange; onChange: (t: TimeRange) => void }) {
+  const bad = value.end <= value.start;
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <div className="row wrap">
+        <span className="small muted">das</span>
+        <TimeField label="Começa" value={value.start} onChange={(v) => onChange({ start: v ?? value.start, end: value.end })} />
+        <span className="small muted">às</span>
+        <TimeField label="Termina" value={value.end} onChange={(v) => onChange({ start: value.start, end: v ?? value.end })} />
+      </div>
+      {bad && <span className="small" style={{ color: "var(--danger)" }}>O fim precisa ser depois do início.</span>}
+    </div>
+  );
+}
+
+function Row3({ day, children }: { day: string; children: React.ReactNode }) {
   return (
     <>
-      <span>{WEEKDAYS[wd]}</span>
-      <div className="seg">
-        {opts.map(([v, l]) => <button key={l} type="button" className={value === v ? "on" : ""} onClick={() => onChange(v)}>{l}</button>)}
-      </div>
+      <span style={{ textTransform: "capitalize", fontWeight: 600 }}>{day}</span>
+      {children}
     </>
+  );
+}
+
+function PlaceSeg({ value, onChange }: { value: Where; onChange: (v: Where) => void }) {
+  const opts: [Where, string][] = [["trabalho", "Escritório"], ["terminal", "Terminal"], ["casa", "Casa"], [null, "Folga"]];
+  return (
+    <div className="seg">
+      {opts.map(([v, l]) => <button key={l} type="button" className={value === v ? "on" : ""} onClick={() => onChange(v)}>{l}</button>)}
+    </div>
   );
 }
 

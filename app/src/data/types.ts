@@ -11,6 +11,7 @@ export interface Settings {
   id: "me";
   onboardingDone: boolean;
   timezone: string;
+  /** Referência para dias "sem horário fixo" de acordar/dormir. */
   wakeTime: string;
   sleepTime: string;
   homeOfficeWeekday: number | null;
@@ -18,7 +19,8 @@ export interface Settings {
   scheduleMode: ScheduleMode;
   defaultAlertMode: AlertMode;
   // notificações (usadas a partir das Fases 2/3)
-  quietStart: string;
+  /** null = silêncio segue o horário de dormir/acordar de cada dia. */
+  quietStart: string | null;
   quietEnd: string | null;
   silentMode: boolean;
   notifyStart: boolean;
@@ -37,17 +39,32 @@ export interface Settings {
   routine: RoutineDraft;
 }
 
-/** O que o onboarding coleta; gera lugares, deslocamentos e compromissos. */
+export interface TimeRange {
+  start: string;
+  end: string;
+}
+
+/** Acordar/dormir de um dia. null = sem horário fixo. */
+export interface WakeSleep {
+  wake: string | null;
+  sleep: string | null;
+}
+
+/**
+ * O que o onboarding coleta; gera lugares, deslocamentos e compromissos.
+ * Cada horário tem "mesmo horário todos os dias" (sameTime) ou um por dia.
+ */
 export interface RoutineDraft {
   places: Record<Exclude<PlaceKind, "outro">, { name: string; region: string }>;
-  internship: {
+  sleep: WakeSleep & { sameTime: boolean; days: Record<number, WakeSleep> };
+  internship: TimeRange & {
     enabled: boolean;
-    start: string;
-    end: string;
+    sameTime: boolean;
     /** por dia da semana (0–6): onde é o estágio, ou null = não tem */
     days: Record<number, "trabalho" | "terminal" | "casa" | null>;
+    times: Record<number, TimeRange>;
   };
-  college: { enabled: boolean; start: string; end: string; days: number[] };
+  college: TimeRange & { enabled: boolean; sameTime: boolean; days: number[]; times: Record<number, TimeRange> };
   travel: Record<string, number>; // "casa>trabalho": 60
 }
 
