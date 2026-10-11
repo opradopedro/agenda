@@ -114,8 +114,11 @@ export interface LLMProvider {
 
 - `gemini.ts` implementa via REST (`generateContent` com
   `responseMimeType: "application/json"` + `responseSchema`).
-- `index.ts` lê `LLM_PROVIDER`, `LLM_MODEL`, `LLM_FALLBACK_MODEL`. Em erro 429
-  (cota) tenta o modelo de fallback (ex.: Flash → Flash-Lite).
+- `index.ts` lê `LLM_PROVIDER`, `LLM_MODEL` (padrão `gemini-3.5-flash`) e
+  `LLM_FALLBACK_MODEL` (padrão `gemini-3.5-flash-lite`). Em cota esgotada, tempo
+  esgotado ou erro do provedor, tenta o fallback.
+- O aviso de cada tarefa (lembrete/alarme/nenhum) não vem da IA: começa no
+  padrão da Config e você muda na proposta.
 - Toda chamada grava uma linha em `llm_usage`; a tela de Config mostra o uso do
   dia, e a function recusa chamadas acima de um teto diário configurável
   (`LLM_DAILY_CAP`) para nunca estourar o gratuito.
@@ -142,7 +145,6 @@ rotina, categorias). Saída:
       "priority": 3,                  // 1 baixa … 4 urgente
       "location": "qualquer",         // casa | rua | qualquer
       "region": null,                 // só p/ rua, se você disser onde ("dentista em Praia Grande")
-      "alert_mode": null,             // nenhum | lembrete | alarme; null = padrão (você ajusta na proposta)
       "is_cooking": true,
       "inferred": false,              // true = sugestão da IA (ex.: "estudar p/ prova")
       "subtasks": [

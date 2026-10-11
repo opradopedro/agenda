@@ -1,0 +1,55 @@
+import type { RoutineDraft, Settings } from "./types";
+
+export const DEFAULT_ROUTINE: RoutineDraft = {
+  places: {
+    casa: { name: "Casa", region: "Praia Grande" },
+    trabalho: { name: "Escritório", region: "Santos" },
+    terminal: { name: "Terminal", region: "Santos" },
+    faculdade: { name: "Faculdade", region: "Santos" },
+  },
+  internship: {
+    enabled: true,
+    start: "09:00",
+    end: "16:00",
+    days: { 0: null, 1: "trabalho", 2: "trabalho", 3: "casa", 4: "trabalho", 5: "trabalho", 6: null },
+  },
+  college: { enabled: true, start: "19:00", end: "23:00", days: [1, 2, 3, 4] },
+  travel: {
+    "casa>trabalho": 60,
+    "trabalho>casa": 60,
+    "casa>terminal": 60,
+    "terminal>casa": 60,
+    "trabalho>faculdade": 15,
+    "terminal>faculdade": 15,
+    "faculdade>casa": 40,
+    "casa>faculdade": 40,
+  },
+};
+
+export const DEFAULT_SETTINGS: Settings = {
+  id: "me",
+  onboardingDone: false,
+  timezone: "America/Sao_Paulo",
+  wakeTime: "07:00",
+  sleepTime: "00:00",
+  homeOfficeWeekday: 3,
+  terminalWeekday: null,
+  scheduleMode: "proposta",
+  defaultAlertMode: "lembrete",
+  quietStart: "00:00",
+  quietEnd: null,
+  silentMode: false,
+  notifyStart: true,
+  notifyEnd: true,
+  notifyProposal: true,
+  reminderLeadMin: 0,
+  moreTimeDefaultMin: 15,
+  slotGranularityMin: 15,
+  taskBufferMin: 10,
+  returnHomeInGaps: false,
+  goHomeMinStayMin: 120,
+  errandFromHomeOverheadMin: 30,
+  lateHour: "22:00",
+  horizonDays: 14,
+  routine: DEFAULT_ROUTINE,
+};

@@ -1,0 +1,6 @@
+project_id = "pqvyqimddzkauyrnbxra"
+
+[functions.interpret]
+# Fase 1 não tem login; o teto diário (LLM_DAILY_CAP) protege a cota.
+# Na Fase 2 passa a exigir o JWT do usuário.
+verify_jwt = false
