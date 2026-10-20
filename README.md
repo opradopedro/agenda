@@ -2,6 +2,7 @@
 
 Organizador semanal pessoal com IA (web + Android).
 
+- **O que falta para ligar tudo:** [docs/CONFIGURAR.md](docs/CONFIGURAR.md)
 - Plano de arquitetura: [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
 - Modelo de dados: [supabase/migrations/20261010000000_init.sql](supabase/migrations/20261010000000_init.sql)
 
@@ -13,6 +14,10 @@ Organizador semanal pessoal com IA (web + Android).
 | `supabase/functions/_shared/scheduler/` | Agendador determinístico (usado pelo app e pelas functions) |
 | `supabase/functions/_shared/llm/` | Módulo de LLM trocável (Gemini hoje) |
 | `supabase/functions/interpret/` | Edge Function: texto → tarefas em JSON |
+| `supabase/functions/cook/` | Receitas saudáveis (modo cozinha) |
+| `supabase/functions/gcal-sync/`, `google-connect/` | Google Calendar (leitura e escrita) |
+| `supabase/functions/push-dispatch/` | Web Push no computador (pg_cron a cada minuto) |
+| `app/android/` | App Android (Capacitor) com o plugin nativo `AgendaNative` |
 
 ## Rodar localmente
 

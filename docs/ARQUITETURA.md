@@ -4,7 +4,7 @@ Organizador semanal pessoal: captura em linguagem natural → IA estrutura em
 tarefas → agendador determinístico encaixa na semana → check-in por
 notificação → reorganiza.
 
-> Status: **proposta para aprovação** (antes da Fase 1).
+> Status: Fases 1 a 4 implementadas. O que falta ligar está em [CONFIGURAR.md](CONFIGURAR.md).
 > Modelo de dados em SQL: [`supabase/migrations/20261010000000_init.sql`](../supabase/migrations/20261010000000_init.sql).
 
 ---
