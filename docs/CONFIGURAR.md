@@ -64,14 +64,18 @@ O token anterior foi revogado. Preciso de um novo para publicar o que foi feito
      assim, depois de confirmar os riscos uma vez.
    - **Conta de distribuição limitada** (grátis, até 20 aparelhos) no Android
      Developer Console. Registra o pacote `com.opradopedro.agenda` com a
-     impressão SHA-256 da chave, que aparece no log do build *App Android
-     (APK)*. Te guio se precisar.
+     impressão SHA-256 da chave:
+     `8F:EC:9C:A3:23:82:66:64:0C:3E:E4:80:E1:8A:33:8E:CB:C3:35:EE:09:39:41:33:1F:AE:9F:A2:85:81:6C:10`.
+     Te guio se precisar.
 4. Abra o app → **Config → Avisos no Android** e libere tudo:
    Notificações, Alarmes e lembretes, Bateria sem restrições e Tela cheia (só
    para tarefas marcadas como alarme). Use **Testar** para ver um lembrete e um
    alarme chegando com a tela bloqueada.
 
 As próximas versões instalam por cima: é só baixar o `agenda.apk` de novo.
+A chave de assinatura fica guardada no cache do GitHub. Para não depender do
+cache (ele expira se ficar 7 dias sem build), posso te passar a chave para virar
+o segredo `ANDROID_KEYSTORE_B64`.
 
 ## 5. Notificações no computador
 
