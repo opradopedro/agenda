@@ -7,6 +7,7 @@ import { ALERT_LABEL } from "../lib/format";
 import { navigate } from "../lib/router";
 import { toast } from "../components/Toast";
 import { TimeField } from "../components/TimeField";
+import { AccountSection } from "./Account";
 
 export function Settings() {
   const s = useLiveQuery(async () => normalizeSettings(await db.settings.get("me")), []);
@@ -16,6 +17,9 @@ export function Settings() {
   return (
     <>
       <header className="top"><h1>Config</h1></header>
+
+      <div className="section-title">Conta e nuvem</div>
+      <div className="card"><AccountSection s={s} /></div>
 
       <div className="section-title">Agendamento</div>
       <div className="card stack">
@@ -48,7 +52,7 @@ export function Settings() {
 
       <div className="section-title">Notificações</div>
       <div className="card">
-        <p className="small muted" style={{ marginTop: 0 }}>As notificações começam a funcionar na Fase 2 (computador) e na Fase 3 (Android). As escolhas já ficam salvas.</p>
+        <p className="small muted" style={{ marginTop: 0 }}>No computador, ligue as notificações em "Conta e nuvem". No Android, elas vêm do app instalado.</p>
         <Toggle label="Silêncio enquanto durmo" hint="Segue o horário de dormir e acordar de cada dia" checked={s.quietStart === null}
           onChange={(v) => set(v ? { quietStart: null, quietEnd: null } : { quietStart: "00:00", quietEnd: "07:00" })} />
         {s.quietStart !== null && (
@@ -88,13 +92,13 @@ export function Settings() {
 
       <div className="section-title">Dados</div>
       <div className="card stack">
-        <span className="small muted">Na Fase 1 tudo fica só neste aparelho. Na Fase 2 passa a sincronizar com a nuvem.</span>
+        <span className="small muted">Tudo fica salvo neste aparelho e, com login, também na nuvem.</span>
         <div className="row wrap">
           <button className="btn" onClick={exportData}>Exportar (JSON)</button>
           <button className="btn danger" onClick={wipe}>Apagar tudo</button>
         </div>
       </div>
-      <p className="small muted" style={{ textAlign: "center", marginTop: 24 }}>Agenda · Fase 1</p>
+      <p className="small muted" style={{ textAlign: "center", marginTop: 24 }}>Agenda IA</p>
     </>
   );
 }

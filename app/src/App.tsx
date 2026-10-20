@@ -9,6 +9,9 @@ import { Checkin } from "./features/Checkin";
 import { Cooking } from "./features/Cooking";
 import { Routines } from "./features/Routines";
 import { generateRoutineTasks } from "./data/routines";
+import { startAutoSync } from "./data/sync";
+import { checkin, type CheckinResponse } from "./data/planner";
+import { toast } from "./components/Toast";
 import { Inbox } from "./features/Inbox";
 import { Onboarding } from "./features/Onboarding";
 import { Proposal } from "./features/Proposal";
@@ -39,8 +42,26 @@ export function App() {
     if (settings) setTimezone(settings.timezone);
   }, [settings]);
 
-  // rotinas: gera as ocorrências que entraram no horizonte (ao abrir e ao voltar para o app)
   const ready = !!settings?.onboardingDone;
+  // nuvem: sincroniza ao abrir, ao voltar para o app e quando houver mudanças
+  // (também antes do onboarding: quem já usa o app em outro aparelho entra e recebe a rotina)
+  useEffect(() => startAutoSync(), []);
+
+  // botões da notificação com o app aberto (o service worker manda a resposta)
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const on = async (ev: MessageEvent) => {
+      const d = ev.data as { type?: string; blockId?: string; response?: string };
+      if (d?.type !== "checkin" || !d.blockId) return;
+      const out = await checkin(d.blockId, d.response as CheckinResponse);
+      toast(out.message);
+      if (out.planId) navigate(`proposta/${out.planId}`);
+    };
+    navigator.serviceWorker.addEventListener("message", on);
+    return () => navigator.serviceWorker.removeEventListener("message", on);
+  }, []);
+
+  // rotinas: gera as ocorrências que entraram no horizonte (ao abrir e ao voltar para o app)
   useEffect(() => {
     if (!ready) return;
     const run = () => generateRoutineTasks().catch(() => undefined);
@@ -54,7 +75,7 @@ export function App() {
   if (!settings.onboardingDone) return <><Onboarding settings={settings} onDone={() => navigate("hoje")} /><ToastHost /></>;
   if (page === "rotina") return <><Onboarding settings={settings} editing onDone={() => navigate("config")} /><ToastHost /></>;
   if (page === "proposta" && arg) return <><Proposal planId={arg} /><ToastHost /></>;
-  if (page === "checkin" && arg) return <><Checkin blockId={arg} /><ToastHost /></>;
+  if (page === "checkin" && arg) return <><Checkin blockId={arg} autoResponse={route[2]} /><ToastHost /></>;
   if (page === "cozinha" && arg) return <><Cooking taskId={arg} /><ToastHost /></>;
   if (page === "rotinas") return <><Routines editId={arg} /><ToastHost /></>;
 

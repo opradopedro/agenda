@@ -63,6 +63,8 @@ export const DEFAULT_SETTINGS: Settings = {
   errandFromHomeOverheadMin: 30,
   lateHour: "22:00",
   horizonDays: 14,
+  gcalReminders: false,
+  gcalReadCalendarIds: [],
   routine: DEFAULT_ROUTINE,
 };
 

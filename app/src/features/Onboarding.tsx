@@ -2,6 +2,7 @@ import { useState } from "react";
 import { applyRoutine, WEEKDAYS, WEEKDAYS_SHORT } from "../data/routine";
 import type { AlertMode, RoutineDraft, ScheduleMode, Settings, TimeRange } from "../data/types";
 import { TimeField } from "../components/TimeField";
+import { cloudAvailable, signInWithGoogle } from "../lib/supabase";
 
 type Where = "trabalho" | "terminal" | "casa" | null;
 
@@ -74,6 +75,12 @@ export function Onboarding({ settings, onDone, editing = false }: { settings: Se
         <div className="stack">
           <h1>{editing ? "Sua rotina" : "Vamos montar sua semana"}</h1>
           <p className="lead">Tudo aqui pode ser mudado depois em Config. Comece pelos horários em que você está acordado.</p>
+          {!editing && cloudAvailable() && (
+            <button type="button" className="btn ghost" style={{ alignSelf: "flex-start", paddingLeft: 0 }}
+              onClick={() => signInWithGoogle().catch((e) => window.alert((e as Error).message))}>
+              Já uso o Agenda em outro aparelho? Entrar com Google
+            </button>
+          )}
           <SameToggle checked={r.sleep.sameTime} onChange={setSleepSame} />
           {r.sleep.sameTime ? (
             <div className="grid2">

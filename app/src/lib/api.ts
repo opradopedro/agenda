@@ -10,7 +10,7 @@ export class ApiError extends Error {}
 let tokenProvider: () => Promise<string | null> = async () => null;
 export const setTokenProvider = (fn: () => Promise<string | null>) => (tokenProvider = fn);
 
-async function callFunction<T>(name: string, body: unknown): Promise<T> {
+export async function callFunction<T>(name: string, body: unknown): Promise<T> {
   if (!URL_BASE) throw new ApiError("App sem VITE_SUPABASE_URL configurada");
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (ANON) headers.apikey = ANON;

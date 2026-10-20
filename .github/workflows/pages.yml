@@ -30,12 +30,26 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm test
+      # chave pública do Supabase: variável do repositório ou buscada com o token (se houver)
+      - name: Chave pública do Supabase
+        id: anon
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          FROM_VARS: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          key="$FROM_VARS"
+          if [ -z "$key" ] && [ -n "$TOKEN" ]; then
+            key=$(curl -fsS -H "Authorization: Bearer $TOKEN" https://api.supabase.com/v1/projects/pqvyqimddzkauyrnbxra/api-keys               | python3 -c "import sys,json; ks=json.load(sys.stdin); print(next((k['api_key'] for k in ks if k.get('name')=='anon'), ''))" || true)
+          fi
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+          [ -n "$key" ] && echo "Nuvem ligada no build." || echo "Sem chave pública: o app funciona só no aparelho."
       - run: npm run build
         env:
           BASE_PATH: /agenda/
-          # valores públicos (a chave anon é feita para ficar no navegador)
+          # valores públicos (feitos para ficar no navegador)
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://pqvyqimddzkauyrnbxra.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ steps.anon.outputs.key }}
+          VITE_VAPID_PUBLIC_KEY: BKqrgwHcUC2ntnJJCWz_3Bh50o5wxkH8989gBfVhA66uaHQHgRszsGheNBY-ZsZvNtxGDhVfyoJiJxvVw2_VO2Q
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist

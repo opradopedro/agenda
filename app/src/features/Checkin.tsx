@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, nowIso } from "../data/db";
 import { checkin, type CheckinResponse } from "../data/planner";
@@ -8,7 +8,7 @@ import { toast } from "../components/Toast";
 import { ALERT_LABEL, fmtDayLabel, fmtDur, fmtRange, localDate } from "../lib/format";
 import { navigate } from "../lib/router";
 
-export function Checkin({ blockId }: { blockId: string }) {
+export function Checkin({ blockId, autoResponse }: { blockId: string; autoResponse?: string }) {
   const data = useLiveQuery(async () => {
     const block = await db.blocks.get(blockId);
     if (!block) return null;
@@ -19,6 +19,16 @@ export function Checkin({ blockId }: { blockId: string }) {
   }, [blockId]);
   const [extra, setExtra] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  // veio de um botão da notificação: aplica uma vez
+  const auto = useRef(false);
+  useEffect(() => {
+    if (auto.current || !data || !autoResponse) return;
+    if (!["terminei", "mais_tempo", "remarcar"].includes(autoResponse)) return;
+    if (data.block.status === "concluido" || data.block.status === "remarcado") return;
+    auto.current = true;
+    answer(autoResponse as CheckinResponse);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, autoResponse]);
 
   if (data === undefined) return null;
   if (data === null) return <div className="app bare"><div className="empty">Esse horário não existe mais.</div></div>;

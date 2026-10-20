@@ -36,6 +36,10 @@ export interface Settings {
   errandFromHomeOverheadMin: number;
   lateHour: string;
   horizonDays: number;
+  /** eventos do "Agenda IA" com lembrete do próprio Google (padrão: sem) */
+  gcalReminders: boolean;
+  /** calendários lidos como compromissos (vazio = principal) */
+  gcalReadCalendarIds: string[];
   routine: RoutineDraft;
 }
 

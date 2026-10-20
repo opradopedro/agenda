@@ -1,0 +1,56 @@
+name: Backend (Supabase)
+
+# Publica migrações e Edge Functions quando algo em supabase/ muda.
+# Precisa dos segredos do repositório SUPABASE_ACCESS_TOKEN e SUPABASE_DB_PASSWORD;
+# sem eles o job é pulado. Os demais segredos são opcionais e, se existirem,
+# são copiados para as Edge Functions.
+on:
+  push:
+    branches: [main, ccr-36e43863-o27otq]
+    paths: ["supabase/**", ".github/workflows/supabase.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: supabase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: pqvyqimddzkauyrnbxra
+    steps:
+      - name: Segredos presentes?
+        id: check
+        run: |
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_DB_PASSWORD" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else echo "Faltam SUPABASE_ACCESS_TOKEN/SUPABASE_DB_PASSWORD: nada publicado."; fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ok
+      - uses: supabase/setup-cli@v1
+        if: steps.check.outputs.ok
+        with:
+          version: 2.48.3
+      - name: Migrações
+        if: steps.check.outputs.ok
+        run: |
+          supabase link --project-ref "$PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
+          supabase db push -p "$SUPABASE_DB_PASSWORD"
+      - name: Segredos das Edge Functions
+        if: steps.check.outputs.ok
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          args=("VAPID_PUBLIC_KEY=BKqrgwHcUC2ntnJJCWz_3Bh50o5wxkH8989gBfVhA66uaHQHgRszsGheNBY-ZsZvNtxGDhVfyoJiJxvVw2_VO2Q" "APP_URL=https://opradopedro.github.io/agenda/")
+          for k in VAPID_PRIVATE_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET ALLOWED_EMAILS GEMINI_API_KEY; do
+            [ -n "${!k}" ] && args+=("$k=${!k}")
+          done
+          supabase secrets set --project-ref "$PROJECT_REF" "${args[@]}"
+      - name: Edge Functions
+        if: steps.check.outputs.ok
+        run: supabase functions deploy --project-ref "$PROJECT_REF" --use-api
