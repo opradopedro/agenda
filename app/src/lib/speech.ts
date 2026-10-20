@@ -1,6 +1,7 @@
 // Microfone: Web Speech API (Chrome/Edge). No Android empacotado (Fase 3)
 // troca por plugin nativo.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AgendaNative, isNative } from "./native";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Recognition = any;
@@ -11,7 +12,8 @@ function ctor(): (new () => Recognition) | null {
 }
 
 export function useSpeech(onFinal: (text: string) => void) {
-  const supported = typeof window !== "undefined" && ctor() !== null;
+  const native = isNative();
+  const supported = native || (typeof window !== "undefined" && ctor() !== null);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +24,16 @@ export function useSpeech(onFinal: (text: string) => void) {
   const stop = useCallback(() => rec.current?.stop(), []);
 
   const start = useCallback(() => {
+    if (native) {
+      // Android: reconhecedor de voz do sistema (abre o diálogo do Google)
+      setError(null);
+      setListening(true);
+      AgendaNative.listen()
+        .then((r) => r.text && finalCb.current(r.text))
+        .catch((e) => (e as Error).message !== "cancelado" && setError((e as Error).message))
+        .finally(() => setListening(false));
+      return;
+    }
     const C = ctor();
     if (!C) return;
     const r = new C();
@@ -50,7 +62,7 @@ export function useSpeech(onFinal: (text: string) => void) {
     rec.current = r;
     r.start();
     setListening(true);
-  }, []);
+  }, [native]);
 
   useEffect(() => () => rec.current?.abort?.(), []);
   return { supported, listening, interim, error, start, stop };

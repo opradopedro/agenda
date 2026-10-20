@@ -8,6 +8,7 @@ import { navigate } from "../lib/router";
 import { toast } from "../components/Toast";
 import { TimeField } from "../components/TimeField";
 import { AccountSection } from "./Account";
+import { isNative } from "../lib/native";
 
 export function Settings() {
   const s = useLiveQuery(async () => normalizeSettings(await db.settings.get("me")), []);
@@ -17,6 +18,16 @@ export function Settings() {
   return (
     <>
       <header className="top"><h1>Config</h1></header>
+
+      {isNative() && (
+        <>
+          <div className="section-title">Android</div>
+          <div className="card stack">
+            <span className="small muted">Permissões de notificação, alarmes exatos e bateria.</span>
+            <button className="btn" onClick={() => navigate("android")}>Avisos no Android</button>
+          </div>
+        </>
+      )}
 
       <div className="section-title">Conta e nuvem</div>
       <div className="card"><AccountSection s={s} /></div>

@@ -7,6 +7,8 @@ import type { Block, Task } from "../data/types";
 import { IconBack, IconNext } from "../components/Icons";
 import { addDaysLocal, fmtDayLabel, fmtDur, fmtRange, fmtTime, localDate, todayLocal } from "../lib/format";
 import { navigate } from "../lib/router";
+import { isNative } from "../lib/native";
+import { androidNeedsSetup } from "./AndroidSetup";
 
 type Row =
   | { kind: "seg"; seg: TimelineSegment }
@@ -66,6 +68,10 @@ export function Today() {
   const pending = useLiveQuery(() => pendingCheckins(now), [now]);
   const tasks = useLiveQuery(async () => new Map((await db.tasks.toArray()).map((t) => [t.id, t])), []);
   const isToday = date === todayLocal();
+  const [needsAndroid, setNeedsAndroid] = useState(false);
+  useEffect(() => {
+    if (isNative()) androidNeedsSetup().then(setNeedsAndroid);
+  }, []);
 
   const rows = data ? buildRows(data) : [];
   const nowIdx = isToday ? rows.findIndex((r) => Date.parse(r.kind === "seg" ? r.seg.end : r.kind === "free" ? r.end : r.block.end) > now) : -1;
@@ -78,6 +84,12 @@ export function Today() {
       </header>
 
       <div className="stack">
+        {needsAndroid && (
+          <button className="banner warn" style={{ border: 0, textAlign: "left" }} onClick={() => navigate("android")}>
+            <span style={{ flex: 1 }}><b>Libere os avisos no Android</b><br /><span className="small">Notificações, alarmes exatos e bateria: 1 minuto.</span></span>
+            <IconNext />
+          </button>
+        )}
         {proposals?.map((p) => (
           <button key={p.id} className="banner" style={{ border: 0, textAlign: "left" }} onClick={() => navigate(`proposta/${p.id}`)}>
             <span style={{ flex: 1 }}><b>Proposta aguardando aprovação</b><br /><span className="small muted">{p.trigger === "checkin" ? "Reorganização após check-in" : `${p.taskIds.length} tarefa(s)`}</span></span>

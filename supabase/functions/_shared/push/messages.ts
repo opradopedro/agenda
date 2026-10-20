@@ -88,10 +88,15 @@ const hm = (iso: string, tz: string) => {
 
 /** Notificações devidas agora (janela de ~1,5 min, o cron roda a cada minuto). */
 export function dueMessages(nowMs: number, blocks: BlockRow[], tasks: Map<string, TaskRow>, s: AppSettings, base: string): (PushMessage & { blockId: string; fireAt: string })[] {
+  return messagesBetween(nowMs - 75000, nowMs + 15000, blocks, tasks, s, base);
+}
+
+/** Todas as notificações com horário em (from, to]: usado pelo Android para agendar no aparelho. */
+export function messagesBetween(fromMs: number, toMs: number, blocks: BlockRow[], tasks: Map<string, TaskRow>, s: AppSettings, base: string): (PushMessage & { blockId: string; fireAt: string; alarm: boolean })[] {
   const tz = s.timezone ?? "America/Sao_Paulo";
   const lead = Number(s.reminderLeadMin ?? 0) * 60000;
   const more = Number(s.moreTimeDefaultMin ?? 15);
-  const out: (PushMessage & { blockId: string; fireAt: string })[] = [];
+  const out: (PushMessage & { blockId: string; fireAt: string; alarm: boolean })[] = [];
   for (const b of blocks) {
     const task = tasks.get(b.task_id);
     const parent = task?.parent_id ? tasks.get(task.parent_id) : undefined;
@@ -103,13 +108,14 @@ export function dueMessages(nowMs: number, blocks: BlockRow[], tasks: Map<string
     if (s.notifyStart !== false) candidates.push(["inicio", Date.parse(b.start_at) - lead]);
     if (s.notifyEnd !== false) candidates.push(["fim", Date.parse(b.end_at)]);
     for (const [kind, at] of candidates) {
-      if (at > nowMs + 15000 || at <= nowMs - 75000) continue;
+      if (at > toMs || at <= fromMs) continue;
       if (!awakeAt(at, s)) continue;
       const alarm = alert === "alarme";
       out.push(
         kind === "inicio"
           ? {
             blockId: b.id,
+            alarm,
             fireAt: new Date(at).toISOString(),
             kind,
             tag: "agenda",
@@ -122,6 +128,7 @@ export function dueMessages(nowMs: number, blocks: BlockRow[], tasks: Map<string
           }
           : {
             blockId: b.id,
+            alarm,
             fireAt: new Date(at).toISOString(),
             kind,
             tag: "agenda",

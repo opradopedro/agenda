@@ -2,6 +2,7 @@
 // segue funcionando só no aparelho.
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { callFunction, setTokenProvider } from "./api";
+import { isNative, nativeOAuth } from "./native";
 
 const URL_BASE = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -35,21 +36,30 @@ export const GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar";
 
 export function redirectUrl(): string {
   // no Android (Fase 3) o retorno é pelo esquema do app
-  const native = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
-  return native ? "com.opradopedro.agenda://login-callback" : `${location.origin}${location.pathname}`;
+  return isNative() ? "com.opradopedro.agenda://login-callback" : `${location.origin}${location.pathname}`;
 }
 
 export async function signInWithGoogle(): Promise<void> {
   if (!supabase) throw new Error("Nuvem não configurada neste app.");
-  const { error } = await supabase.auth.signInWithOAuth({
+  const native = isNative();
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: redirectUrl(),
       scopes: GOOGLE_SCOPES,
       // offline + consent: o Google devolve o refresh token (Calendar no servidor)
       queryParams: { access_type: "offline", prompt: "consent" },
+      // no Android o login abre no navegador do sistema e volta pelo esquema do app
+      skipBrowserRedirect: native,
     },
   });
+  if (error) throw error;
+  if (native && data.url) await nativeOAuth(data.url);
+}
+
+/** Retorno do login no Android: troca o código pela sessão. */
+export async function exchangeCode(code: string): Promise<void> {
+  const { error } = await supabase!.auth.exchangeCodeForSession(code);
   if (error) throw error;
 }
 

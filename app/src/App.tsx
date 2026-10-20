@@ -8,8 +8,11 @@ import { ToastHost } from "./components/Toast";
 import { Checkin } from "./features/Checkin";
 import { Cooking } from "./features/Cooking";
 import { Routines } from "./features/Routines";
+import { AndroidSetup } from "./features/AndroidSetup";
 import { generateRoutineTasks } from "./data/routines";
 import { startAutoSync } from "./data/sync";
+import { startNative } from "./lib/native";
+import { exchangeCode } from "./lib/supabase";
 import { checkin, type CheckinResponse } from "./data/planner";
 import { toast } from "./components/Toast";
 import { Inbox } from "./features/Inbox";
@@ -46,6 +49,8 @@ export function App() {
   // nuvem: sincroniza ao abrir, ao voltar para o app e quando houver mudanças
   // (também antes do onboarding: quem já usa o app em outro aparelho entra e recebe a rotina)
   useEffect(() => startAutoSync(), []);
+  // Android: avisos no aparelho, botões da notificação e retorno do login
+  useEffect(() => startNative(exchangeCode), []);
 
   // botões da notificação com o app aberto (o service worker manda a resposta)
   useEffect(() => {
@@ -78,6 +83,7 @@ export function App() {
   if (page === "checkin" && arg) return <><Checkin blockId={arg} autoResponse={route[2]} /><ToastHost /></>;
   if (page === "cozinha" && arg) return <><Cooking taskId={arg} /><ToastHost /></>;
   if (page === "rotinas") return <><Routines editId={arg} /><ToastHost /></>;
+  if (page === "android") return <><AndroidSetup /><ToastHost /></>;
 
   const tab = TABS.some((t) => t.id === page) ? page : "hoje";
   return (

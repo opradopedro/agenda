@@ -1,0 +1,104 @@
+name: App Android (APK)
+
+# Compila o APK e publica no release "android-latest" do repositório, de onde
+# dá para baixar direto no celular. A assinatura usa sempre a mesma chave:
+# o segredo ANDROID_KEYSTORE_B64 (+ ANDROID_KEYSTORE_PASSWORD) se existir; senão,
+# uma chave gerada no primeiro build e guardada no cache do Actions.
+on:
+  push:
+    branches: [main, ccr-36e43863-o27otq]
+    paths: ["app/**", "supabase/functions/_shared/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm test
+
+      - name: Chave pública do Supabase
+        id: anon
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          FROM_VARS: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          key="$FROM_VARS"
+          if [ -z "$key" ] && [ -n "$TOKEN" ]; then
+            key=$(curl -fsS -H "Authorization: Bearer $TOKEN" https://api.supabase.com/v1/projects/pqvyqimddzkauyrnbxra/api-keys | python3 -c "import sys,json; ks=json.load(sys.stdin); print(next((k['api_key'] for k in ks if k.get('name')=='anon'), ''))" || true)
+          fi
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Web (para dentro do app)
+        run: npm run build && npx cap sync android
+        env:
+          BASE_PATH: /
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://pqvyqimddzkauyrnbxra.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ steps.anon.outputs.key }}
+
+      - name: Chave de assinatura (cache)
+        id: kscache
+        uses: actions/cache@v4
+        with:
+          path: ~/agenda-keystore
+          key: agenda-keystore-v1
+      - name: Chave de assinatura
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p ~/agenda-keystore
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > ~/agenda-keystore/agenda.jks
+            echo "$KS_PASS" > ~/agenda-keystore/pass
+            echo "Usando a chave do segredo ANDROID_KEYSTORE_B64."
+          elif [ ! -f ~/agenda-keystore/agenda.jks ]; then
+            pass=$(openssl rand -hex 16)
+            echo "$pass" > ~/agenda-keystore/pass
+            keytool -genkeypair -v -keystore ~/agenda-keystore/agenda.jks -alias agenda -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$pass" -keypass "$pass" -dname "CN=Agenda IA, O=Pessoal, C=BR"
+            echo "Chave nova gerada e guardada no cache."
+          fi
+          echo "AGENDA_KEYSTORE=$HOME/agenda-keystore/agenda.jks" >> "$GITHUB_ENV"
+          echo "AGENDA_KEYSTORE_PASSWORD=$(cat ~/agenda-keystore/pass)" >> "$GITHUB_ENV"
+          echo "::add-mask::$(cat ~/agenda-keystore/pass)"
+          keytool -list -v -keystore ~/agenda-keystore/agenda.jks -storepass "$(cat ~/agenda-keystore/pass)" | grep -E "SHA256:" | head -1
+
+      - name: APK
+        working-directory: app/android
+        run: ./gradlew assembleRelease --no-daemon -PagendaVersionCode=${{ github.run_number }} -PagendaVersionName=1.${{ github.run_number }}
+
+      - name: Publicar no release android-latest
+        working-directory: app/android/app/build/outputs/apk/release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app-release.apk agenda.apk
+          gh release delete android-latest --yes --cleanup-tag -R "$GITHUB_REPOSITORY" || true
+          gh release create android-latest agenda.apk -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "Agenda IA para Android (build ${{ github.run_number }})" \
+            --notes "Baixe agenda.apk no celular e instale. Commit $GITHUB_SHA."
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agenda-apk
+          path: app/android/app/build/outputs/apk/release/agenda.apk
