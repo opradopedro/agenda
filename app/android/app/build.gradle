@@ -8,8 +8,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // no CI: número da execução (cada APK novo instala por cima do anterior)
-        versionCode (project.findProperty("agendaVersionCode") ?: "1").toInteger()
-        versionName (project.findProperty("agendaVersionName") ?: "1.0")
+        versionCode = Integer.parseInt((project.findProperty("agendaVersionCode") ?: "1").toString())
+        versionName = (project.findProperty("agendaVersionName") ?: "1.0").toString()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
