@@ -124,7 +124,8 @@ export function Proposal({ planId }: { planId: string }) {
                 {!decided && <input type="checkbox" checked={!isEx} disabled={busy} onChange={() => toggle(t)} aria-label={`Agendar ${t.title}`} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="row"><span className="dot" /><b style={{ flex: 1 }}>{t.title}</b>
-                    {t.inferred && <span className="chip accent">sugestão</span>}</div>
+                    {t.inferred && <span className="chip accent">sugestão</span>}
+                    {t.routineDate && <span className="chip accent">rotina · {fmtDayLabel(t.routineDate)}</span>}</div>
                   <Meta t={t} />
                   <div className="small muted" style={{ marginTop: 4 }}>Aviso: {ALERT_LABEL[t.alertMode ?? data.defaultAlert]}</div>
                   {!isEx && !kids.length && <div style={{ marginTop: 6 }}>{when(t)}</div>}
@@ -146,6 +147,9 @@ export function Proposal({ planId }: { planId: string }) {
               )}
               {!decided && editing === t.id && (
                 <TaskEdit task={t} isParent={kids.length > 0} onCancel={() => setEditing(null)} onSaved={() => run(async () => { setEditing(null); await replan(planId); })} />
+              )}
+              {t.isCooking && (
+                <a className="btn ghost" style={{ marginTop: 6, paddingLeft: 0 }} href={`#/cozinha/${t.id}`}>🍳 Receitas e lista de compras</a>
               )}
               {!decided && editing !== t.id && (
                 <div className="row" style={{ marginTop: 8 }}>

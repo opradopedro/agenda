@@ -40,7 +40,10 @@ export function Settings() {
             : "Horários de acordar e dormir diferentes por dia"}
           . Estágio, faculdade, lugares e deslocamentos.
         </div>
-        <button className="btn" onClick={() => navigate("rotina")}>Editar rotina</button>
+        <div className="row wrap">
+          <button className="btn" onClick={() => navigate("rotina")}>Editar rotina</button>
+          <button className="btn" onClick={() => navigate("rotinas")}>Rotinas recorrentes</button>
+        </div>
       </div>
 
       <div className="section-title">Notificações</div>

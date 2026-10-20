@@ -86,6 +86,7 @@ export function Inbox() {
                   <button className="icon-btn" aria-label="Apagar" onClick={() => remove(t)}><IconTrash /></button></div>
                 {t.parentId && <div className="small muted">Etapa de: {data.byId.get(t.parentId)?.title}</div>}
                 <Meta t={t} />
+                {(t.isCooking || data.byId.get(t.parentId ?? "")?.isCooking) && <a className="btn ghost" style={{ paddingLeft: 0 }} href={`#/cozinha/${t.id}`}>🍳 Receitas e lista de compras</a>}
                 {t.unplacedReason && <div className="unplaced">{t.unplacedReason}</div>}
                 {editing === t.id ? (
                   <TaskEdit task={t} isParent={false} onCancel={() => setEditing(null)} onSaved={async () => { setEditing(null); await scheduleAll([t.parentId ?? t.id]); }} />
@@ -109,6 +110,7 @@ export function Inbox() {
               <div key={t.id} className={`card task-card cat-${t.category}`}>
                 <div className="row"><span className="dot" /><b style={{ flex: 1 }}>{t.title}</b></div>
                 <Meta t={t} />
+                {(t.isCooking || data.byId.get(t.parentId ?? "")?.isCooking) && <a className="btn ghost" style={{ paddingLeft: 0 }} href={`#/cozinha/${t.id}`}>🍳 Receitas e lista de compras</a>}
                 <div className="row" style={{ marginTop: 8 }}>
                   <button className="btn ghost danger" onClick={() => remove(t)}>Descartar</button>
                   <button className="btn primary spacer" disabled={busy} onClick={() => accept(t)}>Quero fazer</button>

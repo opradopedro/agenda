@@ -27,6 +27,8 @@ export interface ParsedTask {
   splittable: boolean;
   notes: string | null;
   subtasks: ParsedSubtask[];
+  /** dias da semana em que se repete (0 = domingo); vazio = acontece uma vez */
+  recurrence_weekdays: number[];
 }
 
 export interface ParsedEvent {
@@ -91,6 +93,11 @@ export const INTERPRETATION_SCHEMA = {
           inferred: { type: "boolean" },
           splittable: { type: "boolean" },
           notes: nstr(),
+          recurrence_weekdays: {
+            type: "array",
+            items: { type: "integer" },
+            description: "dias em que a tarefa se repete toda semana (0=domingo … 6=sábado); [] se não se repete",
+          },
           subtasks: {
             type: "array",
             items: {
@@ -107,7 +114,7 @@ export const INTERPRETATION_SCHEMA = {
         },
         required: [
           "title", "category", "duration_min", "deadline", "deadline_hard", "earliest_start", "priority",
-          "location", "region", "is_cooking", "inferred", "splittable", "notes", "subtasks",
+          "location", "region", "is_cooking", "inferred", "splittable", "notes", "subtasks", "recurrence_weekdays",
         ],
       },
     },
@@ -139,6 +146,7 @@ Regras:
 - splittable: true para trabalho longo que pode ser feito em partes (estudar, escrever TCC); false para o resto.
 - inferred: true SÓ para tarefas que a pessoa não pediu mas fazem sentido (ex.: "estudar para a prova" quando ela só disse que tem prova). Seja comedido: no máximo uma por compromisso.
 - questions: dúvidas importantes que impediram de entender algo; normalmente vazio.
+- recurrence_weekdays: só quando o texto disser que se repete ("toda quarta", "segunda e quinta", "todo dia" = [0..6]). Domingo=0, segunda=1, …, sábado=6. Nesse caso não use deadline nem earliest_start. Senão [].
 - Títulos curtos em português, começando com verbo quando for tarefa.`;
 
   const user = `Agora: ${ctx.now} (${wd}, fuso ${ctx.timezone}).
@@ -245,6 +253,9 @@ export function validateInterpretation(raw: unknown, sourceText?: string): Inter
       splittable: t.splittable === true && subtasks.length === 0,
       notes: text(t.notes, 500),
       subtasks,
+      recurrence_weekdays: Array.isArray(t.recurrence_weekdays)
+        ? [...new Set((t.recurrence_weekdays as unknown[]).map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort()
+        : [],
     });
   }
 

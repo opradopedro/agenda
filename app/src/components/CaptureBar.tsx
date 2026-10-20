@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { submitCapture } from "../data/capture";
+import { describeRrule } from "@shared/scheduler/index.ts";
 import { navigate } from "../lib/router";
 import { useSpeech } from "../lib/speech";
 import { IconMic, IconSend, IconStop } from "./Icons";
@@ -34,6 +35,7 @@ export function CaptureBar() {
       setText("");
       viaVoice.current = false;
       if (r.questions.length) toast(`A IA ficou com dúvida: ${r.questions[0]}`);
+      else if (r.routines.length) toast(`Rotina criada: ${r.routines.map((x) => `${x.title} (${describeRrule(x.rrule)})`).join("; ")}.`);
       if (!r.outcome) toast("Nada para agendar nesse texto.");
       else if (r.outcome.mode === "proposta") navigate(`proposta/${r.outcome.planId}`);
       else toast(`${r.outcome.placed} tarefa(s) agendada(s)${r.outcome.unplaced ? `, ${r.outcome.unplaced} sem horário (veja a Caixa)` : ""}.`);

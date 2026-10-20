@@ -10,21 +10,15 @@ import {
   validateInterpretation,
 } from "../_shared/interpret/contract.ts";
 import { countToday, logUsage } from "../_shared/usage.ts";
-
-const CORS = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
-  "access-control-allow-methods": "POST, OPTIONS",
-};
-
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, "content-type": "application/json" } });
+import { authorize, CORS, json } from "../_shared/http.ts";
 
 type Env = (k: string) => string | undefined;
 
 export async function handle(req: Request, env: Env): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "use POST" });
+  const auth = await authorize(req, env);
+  if (!auth.ok) return json(auth.status, { error: auth.error });
 
   let body: { text?: unknown; context?: Partial<InterpretContext> };
   try {
@@ -60,7 +54,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
 
   const prompt = buildPrompt(text, ctx);
   const log = (r: { model: string; ok: boolean; error?: string; usage?: { inputTokens: number; outputTokens: number } }) =>
-    logUsage(env, { fn: "interpret", provider: llm.provider, ...r });
+    logUsage(env, { fn: "interpret", provider: llm.provider, userId: auth.userId, ...r });
 
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {

@@ -46,6 +46,9 @@ export function Checkin({ blockId }: { blockId: string }) {
       <div className={`card cat-${task?.category ?? "pessoal"}`} style={{ borderLeft: "4px solid var(--cat)" }}>
         <div style={{ fontSize: "1.25rem", fontWeight: 700 }}>{task?.title ?? "Tarefa"}</div>
         {parent && <div className="muted small">{parent.title}</div>}
+        {(task?.isCooking || parent?.isCooking) && (
+          <a className="btn ghost" style={{ paddingLeft: 0 }} href={`#/cozinha/${task!.id}`}>🍳 Receitas e lista de compras</a>
+        )}
         <div className="muted" style={{ marginTop: 4 }}>{fmtDayLabel(localDate(block.start))} · {fmtRange(block.start, block.end)}{block.windowKind === "fora" && block.region ? ` · em ${block.region}` : ""}</div>
         {task && (
           <label className="field" style={{ marginTop: 12 }}><span>Aviso desta tarefa</span>

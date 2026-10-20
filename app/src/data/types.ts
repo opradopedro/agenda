@@ -129,6 +129,9 @@ export interface Task {
   parentId: string | null;
   seq: number;
   captureId: string | null;
+  routineId?: string | null;
+  /** dia (YYYY-MM-DD) da ocorrência da rotina que gerou a tarefa */
+  routineDate?: string | null;
   title: string;
   notes: string | null;
   category: Category;
@@ -191,4 +194,95 @@ export interface Checkin {
   extraMin: number | null;
   channel: "android" | "web_push" | "tela";
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Fase 4: rotinas e modo cozinha
+// ---------------------------------------------------------------------------
+
+export interface RoutineStep {
+  title: string;
+  durationMin: number;
+  location: LocationReq;
+  region: string | null;
+}
+
+/** Modelo da tarefa criada a cada ocorrência da rotina. */
+export interface RoutineTemplate {
+  title: string;
+  category: Category;
+  durationMin: number;
+  location: LocationReq;
+  region: string | null;
+  priority: number;
+  isCooking: boolean;
+  splittable: boolean;
+  alertMode: AlertMode | null;
+  notes: string | null;
+  subtasks: RoutineStep[];
+}
+
+export interface Routine {
+  id: string;
+  title: string;
+  /** RFC 5545 simplificado: FREQ=WEEKLY;BYDAY=WE[,FR][;INTERVAL=2] */
+  rrule: string;
+  template: RoutineTemplate;
+  /** janela preferida no dia (opcional) */
+  preferredStart: string | null;
+  preferredEnd: string | null;
+  /** primeira data válida (base para INTERVAL) */
+  startDate: string;
+  active: boolean;
+  generatedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecipeIngredient {
+  name: string;
+  qty: number | null;
+  unit: string | null;
+  section: string;
+}
+
+export interface Recipe {
+  id: string;
+  taskId: string | null;
+  title: string;
+  servings: number;
+  prepMin: number;
+  activeMin: number;
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  healthNotes: string | null;
+  chosen: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShoppingList {
+  id: string;
+  taskId: string | null;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShoppingItem {
+  id: string;
+  listId: string;
+  name: string;
+  qty: number | null;
+  unit: string | null;
+  section: string;
+  recipeIds: string[];
+  checked: boolean;
+  updatedAt: string;
+}
+
+/** Estado interno (sync, sementes etc.). */
+export interface KV {
+  key: string;
+  value: unknown;
 }

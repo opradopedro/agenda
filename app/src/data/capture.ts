@@ -1,13 +1,23 @@
 // Captura → IA → tarefas/eventos → agendador.
-import { localToMin, minToIso } from "@shared/scheduler/index.ts";
+import { localToMin, minToIso, toRrule } from "@shared/scheduler/index.ts";
 import type { Interpretation } from "@shared/interpret/contract.ts";
 import { interpret } from "../lib/api";
 import { db, newId, nowIso } from "./db";
 import { planTasks, type PlanOutcome } from "./planner";
+import { createRoutineInstances } from "./routines";
+import { todayLocal } from "../lib/format";
 import { getSettings, routineSummary } from "./routine";
-import type { AgendaEvent, Capture, Task } from "./types";
+import type { AgendaEvent, Capture, Routine, Task } from "./types";
 
-export async function submitCapture(text: string, input: Capture["input"]): Promise<{ captureId: string; outcome?: PlanOutcome; questions: string[] }> {
+export interface CaptureResult {
+  captureId: string;
+  outcome?: PlanOutcome;
+  questions: string[];
+  /** rotinas criadas a partir do texto ("toda quarta…") */
+  routines: Routine[];
+}
+
+export async function submitCapture(text: string, input: Capture["input"]): Promise<CaptureResult> {
   const capture: Capture = {
     id: newId(),
     rawText: text.trim(),
@@ -22,7 +32,7 @@ export async function submitCapture(text: string, input: Capture["input"]): Prom
   return processCapture(capture.id);
 }
 
-export async function processCapture(captureId: string): Promise<{ captureId: string; outcome?: PlanOutcome; questions: string[] }> {
+export async function processCapture(captureId: string): Promise<CaptureResult> {
   const cap = await db.captures.get(captureId);
   if (!cap) throw new Error("captura não encontrada");
   await db.captures.update(captureId, { status: "interpretando", error: null });
@@ -44,12 +54,14 @@ export async function processCapture(captureId: string): Promise<{ captureId: st
     throw e;
   }
 
-  const { taskIds, eventIds, inferredIds } = await materialize(captureId, result.interpretation);
+  const { taskIds, eventIds, inferredIds, routines } = await materialize(captureId, result.interpretation);
   await db.captures.update(captureId, { status: "interpretado", llmResult: result.interpretation, llmModel: result.model });
-  const outcome = taskIds.length || eventIds.length
-    ? await planTasks(taskIds, "captura", { captureId, eventIds, excluded: inferredIds })
+  const fromRoutines = routines.length ? await createRoutineInstances() : [];
+  const all = [...taskIds, ...fromRoutines];
+  const outcome = all.length || eventIds.length
+    ? await planTasks(all, "captura", { captureId, eventIds, excluded: inferredIds })
     : undefined;
-  return { captureId, outcome, questions: result.interpretation.questions };
+  return { captureId, outcome, questions: result.interpretation.questions, routines };
 }
 
 async function materialize(captureId: string, it: Interpretation) {
@@ -81,7 +93,36 @@ async function materialize(captureId: string, it: Interpretation) {
     });
   }
 
+  const routines: Routine[] = [];
   for (const t of it.tasks) {
+    if (t.recurrence_weekdays?.length && !t.inferred) {
+      routines.push({
+        id: newId(),
+        title: t.title,
+        rrule: toRrule({ weekdays: t.recurrence_weekdays, interval: 1 }),
+        template: {
+          title: t.title,
+          category: t.category,
+          durationMin: t.duration_min,
+          location: t.location,
+          region: t.region,
+          priority: t.priority,
+          isCooking: t.is_cooking,
+          splittable: t.splittable,
+          alertMode: null,
+          notes: t.notes,
+          subtasks: t.subtasks.map((s) => ({ title: s.title, durationMin: s.duration_min, location: s.location, region: s.region })),
+        },
+        preferredStart: null,
+        preferredEnd: null,
+        startDate: todayLocal(),
+        active: true,
+        generatedUntil: null,
+        createdAt: ts,
+        updatedAt: ts,
+      });
+      continue;
+    }
     const id = newId();
     const base = {
       captureId,
@@ -136,11 +177,12 @@ async function materialize(captureId: string, it: Interpretation) {
     if (t.inferred) inferredIds.push(id);
   }
 
-  await db.transaction("rw", [db.tasks, db.events], async () => {
+  await db.transaction("rw", [db.tasks, db.events, db.routines], async () => {
     await db.tasks.bulkAdd(tasks);
     await db.events.bulkAdd(events);
+    await db.routines.bulkAdd(routines);
   });
-  return { taskIds, eventIds: events.map((e) => e.id), inferredIds };
+  return { taskIds, eventIds: events.map((e) => e.id), inferredIds, routines };
 }
 
 const toMin = (hhmm: string) => {

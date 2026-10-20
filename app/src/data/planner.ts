@@ -369,7 +369,7 @@ export async function checkin(blockId: string, response: CheckinResponse, extraM
 }
 
 /** Tira blocos da agenda (e das etapas seguintes da mesma tarefa) e re-encaixa. */
-async function reschedule(blocks: Block[], trigger: PlanTrigger, extraTaskIds: string[] = []): Promise<PlanOutcome> {
+export async function reschedule(blocks: Block[], trigger: PlanTrigger, extraTaskIds: string[] = []): Promise<PlanOutcome> {
   const ts = nowIso();
   const taskIds = new Set([...blocks.map((b) => b.taskId), ...extraTaskIds]);
   // etapas posteriores da mesma tarefa também saem, para manter a ordem
@@ -392,4 +392,20 @@ async function reschedule(blocks: Block[], trigger: PlanTrigger, extraTaskIds: s
 export async function pendingCheckins(now = Date.now()): Promise<Block[]> {
   const ended = (await db.blocks.where("status").anyOf(ACTIVE).toArray()).filter((b) => Date.parse(b.end) <= now);
   return ended.sort((a, b) => a.end.localeCompare(b.end));
+}
+
+/**
+ * Depois de mudar a duração de uma tarefa (ex.: receitas escolhidas): refaz a
+ * proposta pendente em que ela está, ou re-encaixa o horário já confirmado.
+ */
+export async function refreshTaskSchedule(taskId: string): Promise<PlanOutcome | null> {
+  const blocks = await db.blocks.where("taskId").equals(taskId).toArray();
+  const proposed = blocks.find((b) => b.status === "proposto" && b.planId);
+  if (proposed?.planId) {
+    await replan(proposed.planId);
+    return null;
+  }
+  const active = blocks.filter((b) => b.status === "confirmado");
+  if (active.length) return reschedule(active, "manual");
+  return null;
 }

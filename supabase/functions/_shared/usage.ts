@@ -33,7 +33,7 @@ export async function countToday(env: Env): Promise<number | null> {
 
 export async function logUsage(
   env: Env,
-  u: { fn: string; provider: string; model: string; ok: boolean; error?: string; usage?: { inputTokens: number; outputTokens: number } },
+  u: { fn: string; provider: string; model: string; ok: boolean; error?: string; userId?: string | null; usage?: { inputTokens: number; outputTokens: number } },
 ): Promise<void> {
   const r = rest(env);
   if (!r) return;
@@ -43,6 +43,7 @@ export async function logUsage(
       headers: { ...r.headers, "content-type": "application/json", prefer: "return=minimal" },
       body: JSON.stringify({
         fn: u.fn,
+        user_id: u.userId ?? null,
         provider: u.provider,
         model: u.model,
         ok: u.ok,

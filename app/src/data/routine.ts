@@ -1,12 +1,11 @@
 // Onboarding → lugares, deslocamentos e compromissos fixos.
-import { db } from "./db";
+import { db, newId } from "./db";
 import { normalizeSettings } from "./defaults";
 import type { Commitment, Place, RoutineDraft, Settings, TimeRange, Travel, WakeSleep } from "./types";
 
 export const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 export const WEEKDAYS_SHORT = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
-const placeId = (kind: string) => `place-${kind}`;
 
 export async function getSettings(): Promise<Settings> {
   return normalizeSettings(await db.settings.get("me"));
@@ -26,6 +25,13 @@ export async function saveSettings(patch: Partial<Settings>): Promise<void> {
 }
 
 export async function applyRoutine(draft: RoutineDraft, patch: Partial<Settings>): Promise<void> {
+  // reaproveita os ids existentes (sync) e cria novos só para lugares novos
+  const existing = new Map((await db.places.toArray()).map((p) => [p.kind, p.id]));
+  const ids = new Map<string, string>();
+  const placeId = (kind: string) => {
+    if (!ids.has(kind)) ids.set(kind, existing.get(kind as Place["kind"]) ?? newId());
+    return ids.get(kind)!;
+  };
   const places: Place[] = (Object.keys(draft.places) as (keyof RoutineDraft["places"])[]).map((kind) => ({
     id: placeId(kind),
     kind,
@@ -37,7 +43,7 @@ export async function applyRoutine(draft: RoutineDraft, patch: Partial<Settings>
     .filter(([, m]) => Number.isFinite(m) && m >= 0)
     .map(([k, minutes]) => {
       const [from, to] = k.split(">");
-      return { id: `travel-${from}-${to}`, fromPlaceId: placeId(from), toPlaceId: placeId(to), minutes };
+      return { id: newId(), fromPlaceId: placeId(from), toPlaceId: placeId(to), minutes };
     });
 
   const commitments: Commitment[] = [];
@@ -48,7 +54,7 @@ export async function applyRoutine(draft: RoutineDraft, patch: Partial<Settings>
       const t = internshipFor(draft, wd);
       if (t.end <= t.start) continue;
       commitments.push({
-        id: `est-${wd}`,
+        id: newId(),
         title: where === "casa" ? "Estágio (home office)" : where === "terminal" ? "Estágio (terminal)" : "Estágio",
         category: "trabalho",
         weekday: wd,
@@ -65,7 +71,7 @@ export async function applyRoutine(draft: RoutineDraft, patch: Partial<Settings>
       const t = collegeFor(draft, wd);
       if (t.end <= t.start) continue;
       commitments.push({
-        id: `facu-${wd}`,
+        id: newId(),
         title: "Faculdade",
         category: "faculdade",
         weekday: wd,
@@ -83,11 +89,12 @@ export async function applyRoutine(draft: RoutineDraft, patch: Partial<Settings>
   const terminal = Object.keys(days).map(Number).find((d) => days[d] === "terminal") ?? null;
 
   await db.transaction("rw", [db.places, db.travel, db.commitments, db.settings], async () => {
-    await db.places.clear();
+    const keep = new Set(places.map((p) => p.id));
+    await db.places.filter((p) => !keep.has(p.id)).delete();
     await db.places.bulkPut(places);
-    await db.travel.clear();
+    await db.travel.toCollection().delete();
     await db.travel.bulkPut(travel);
-    await db.commitments.where("id").startsWithAnyOf("est-", "facu-").delete();
+    await db.commitments.filter((c) => c.origin === "onboarding").delete();
     await db.commitments.bulkPut(commitments);
     const cur = await getSettings();
     await db.settings.put({

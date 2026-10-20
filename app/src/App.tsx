@@ -6,6 +6,9 @@ import { CaptureBar } from "./components/CaptureBar";
 import { IconGear, IconInbox, IconToday, IconWeek } from "./components/Icons";
 import { ToastHost } from "./components/Toast";
 import { Checkin } from "./features/Checkin";
+import { Cooking } from "./features/Cooking";
+import { Routines } from "./features/Routines";
+import { generateRoutineTasks } from "./data/routines";
 import { Inbox } from "./features/Inbox";
 import { Onboarding } from "./features/Onboarding";
 import { Proposal } from "./features/Proposal";
@@ -36,11 +39,24 @@ export function App() {
     if (settings) setTimezone(settings.timezone);
   }, [settings]);
 
+  // rotinas: gera as ocorrências que entraram no horizonte (ao abrir e ao voltar para o app)
+  const ready = !!settings?.onboardingDone;
+  useEffect(() => {
+    if (!ready) return;
+    const run = () => generateRoutineTasks().catch(() => undefined);
+    run();
+    const onVis = () => document.visibilityState === "visible" && run();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [ready]);
+
   if (!settings) return null;
   if (!settings.onboardingDone) return <><Onboarding settings={settings} onDone={() => navigate("hoje")} /><ToastHost /></>;
   if (page === "rotina") return <><Onboarding settings={settings} editing onDone={() => navigate("config")} /><ToastHost /></>;
   if (page === "proposta" && arg) return <><Proposal planId={arg} /><ToastHost /></>;
   if (page === "checkin" && arg) return <><Checkin blockId={arg} /><ToastHost /></>;
+  if (page === "cozinha" && arg) return <><Cooking taskId={arg} /><ToastHost /></>;
+  if (page === "rotinas") return <><Routines editId={arg} /><ToastHost /></>;
 
   const tab = TABS.some((t) => t.id === page) ? page : "hoje";
   return (
